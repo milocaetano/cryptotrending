@@ -12,19 +12,22 @@ async def run(symbols, binance, timeframe):
         if keyboard.is_pressed('esc'):
             print("ESC key pressed. Exiting...")
             return False   
-        trend, candle = trendtracker.analyze_trend(symbol, binance, timeframe=timeframe)      
+        trend, candle, congestion_chance = trendtracker.analyze_trend(symbol, binance, timeframe=timeframe)  
+
+        if congestion_chance is not None:
+            if congestion_chance is True:              
+                print(f"Chances Alta de congestão para {symbol}: {congestion_chance}") 
+            else:
+               await telegram.send_msg(f"Chances de congestão para {symbol}: {congestion_chance}")
+               print(f"Chances Baixa de congestão para {symbol}: {congestion_chance}") 
         if candle is not None:
             print(f"Tendência para {symbol}: {trend}")
-            print("Candle encontrado:", candle)
+            print(f"Candle encontrado:{candle}")
             await telegram.send_msg(f"Tendência para {symbol}: {trend}")
             await telegram.send_msg(f"Candle encontrado:") 
                 
-        else:  
-            if(trend == 'Alta' or trend == 'Baixa'):
-                    await telegram.send_msg(f"Tendência para {symbol}: {trend}")
-                    await telegram.send_msg(f"Candle Não encontrado")
-     
-            print(f"Tendência para {symbol}: {trend}, nenhum candle encontrado") 
+        else:            
+            print(f"Tendência para {symbol}: {trend}, nenhum candle encontrado")           
     return True  
 
 
