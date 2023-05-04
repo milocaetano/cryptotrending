@@ -1,4 +1,3 @@
-import ccxt
 import time
 import ccxt
 

@@ -1,7 +1,7 @@
 import ccxt
 import pandas as pd
 import numpy as np
-
+import pytz
 # Inicializando a API
 exchange = ccxt.binance({
     'rateLimit': 1200,
@@ -11,7 +11,7 @@ exchange = ccxt.binance({
 # Configurando parâmetros
 symbol = 'BNB/USDT'
 timeframe = '5m'
-since = exchange.parse8601('2022-01-01T00:00:00Z')
+since = exchange.parse8601('2023-05-02T00:00:00Z')
 now = exchange.milliseconds()
 
 # Buscando dados históricos
@@ -24,6 +24,11 @@ df['l1'] = df['low'].shift(1)
 df['uptrend'] = df['close'] > df['close'].rolling(window=20).mean()
 df['downtrend'] = df['close'] < df['close'].rolling(window=20).mean()
 df['atr'] = df['high'] - df['low']
+df['timestamp_formatted'] = pd.to_datetime(df['timestamp'], unit='ms').dt.strftime('%Y-%m-%d %H:%M:%S')
+br_zone = pytz.timezone('America/Sao_Paulo')
+df['timestamp_formatted_br'] = pd.to_datetime(df['timestamp'], unit='ms').dt.tz_localize('UTC').dt.tz_convert(br_zone).dt.strftime('%Y-%m-%d %H:%M:%S')
+
+
 
 openPosition =False
 
@@ -65,7 +70,7 @@ for index, row in df.iterrows():
             if positions < 0:
                 balance += positions * (row['high'] - entry_price)
                 positions = 0
-                print(f"Fechando posição short: {row['high']:.2f}, Saldo: {balance:.2f}")   
+                print(f"Fechando posição short: {row['high']:.2f}, Saldo: {balance:.2f} TimeStamp: {row['timestamp_formatted_br']}")   
         if positions == 0:
             entry_price = row['high'] + 1
             stop_loss = row['low'] - row['atr'] - 1
@@ -73,13 +78,13 @@ for index, row in df.iterrows():
             position_size = (risk_per_trade / (entry_price - stop_loss)) * leverage
             positions = (balance * leverage) / entry_price
             half_exit = False
-            print(f"Entrada long: {entry_price:.2f}, Posições: {positions:.4f}, Stop Loss: {stop_loss:.2f}, Stop Gain: {stop_gain:.2f}")
+            print(f"Entrada long: {entry_price:.2f}, Posições: {positions:.4f}, Stop Loss: {stop_loss:.2f}, Stop Gain: {stop_gain:.2f} TimeStamp: {row['timestamp_formatted_br']}")
     elif row['position'] == 'short':
         if positions >= 0:  # Adicionado condição para fechar a posição long, se houver
             if positions > 0:
                 balance += positions * (entry_price - row['low'])
                 positions = 0
-                print(f"Fechando posição long: {row['low']:.2f}, Saldo: {balance:.2f}")
+                print(f"Fechando posição long: {row['low']:.2f}, Saldo: {balance:.2f} TimeStamp: {row['timestamp_formatted_br']}")
 
         if positions > 0:
             exit_price = row['low'] - 1
@@ -88,7 +93,7 @@ for index, row in df.iterrows():
             position_size = (risk_per_trade / (stop_loss - entry_price)) * leverage
             positions = (balance * leverage) / entry_price
             half_exit = False
-            print(f"Entrada short: {exit_price:.2f}, Posições: {positions:.4f}, Stop Loss: {stop_loss:.2f}, Stop Gain: {stop_gain:.2f}")
+            print(f"Entrada short: {exit_price:.2f}, Posições: {positions:.4f}, Stop Loss: {stop_loss:.2f}, Stop Gain: {stop_gain:.2f} TimeStamp: {row['timestamp_formatted_br']}")
 
     # Verificar stop loss e stop gain
     if positions > 0:
@@ -96,18 +101,18 @@ for index, row in df.iterrows():
             balance -= risk_per_trade
             positions = 0
             half_exit = False
-            print(f"Stop loss atingido (long): {stop_loss:.2f}, Saldo: {balance:.2f}")
+            print(f"Stop loss atingido (long): {stop_loss:.2f}, Saldo: {balance:.2f} TimeStamp: {row['timestamp_formatted_br']}")
         elif row['high'] >= stop_loss and row['position'] == 'short':
             balance -= risk_per_trade
             positions = 0
             half_exit = False
-            print(f"Stop loss atingido (short): {stop_loss:.2f}, Saldo: {balance:.2f}")
+            print(f"Stop loss atingido (short): {stop_loss:.2f}, Saldo: {balance:.2f} TimeStamp: {row['timestamp_formatted_br']}")
         elif row['high'] >= stop_gain and row['position'] == 'long' and not half_exit:
             balance += risk_per_trade / 2
             positions /= 2
             half_exit = True
             trailing_stop = row['high'] - row['atr']
-            print(f"Stop gain atingido (long): {stop_gain:.2f}, Saldo: {balance:.2f}, Trailing stop: {trailing_stop:.2f}")
+            print(f"Stop gain atingido (long): {stop_gain:.2f}, Saldo: {balance:.2f}, Trailing stop: {trailing_stop:.2f}   TimeStamp: {row['timestamp_formatted_br']} ")
         elif row['low'] <= stop_gain and row['position'] == 'short' and not half_exit:
             balance += risk_per_trade / 2
             positions /= 2
@@ -125,7 +130,7 @@ for index, row in df.iterrows():
                     balance += positions * (row['low'] - entry_price)
                     positions = 0
                     half_exit = False
-                    print(f"Trailing stop atingido (long): {trailing_stop:.2f}, Saldo: {balance:.2f}")
+                    print(f"Trailing stop atingido (long): {trailing_stop:.2f}, Saldo: {balance:.2f} TimeStamp: {row['timestamp_formatted_br']}")
             elif row['position'] == 'short':
                 new_trailing_stop = row['low'] + row['atr']
                 if new_trailing_stop < trailing_stop:
@@ -134,7 +139,7 @@ for index, row in df.iterrows():
                     balance += positions * (entry_price - row['high'])
                     positions = 0
                     half_exit = False
-                    print(f"Trailing stop atingido (short): {trailing_stop:.2f}, Saldo: {balance:.2f}")
+                    print(f"Trailing stop atingido (short): {trailing_stop:.2f}, Saldo: {balance:.2f} TimeStamp: {row['timestamp_formatted_br']}")
 
 if positions > 0:
     balance = positions * df.iloc[-1]['close']

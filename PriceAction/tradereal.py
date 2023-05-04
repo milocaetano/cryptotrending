@@ -47,7 +47,7 @@ previous_low = None
 def strategy(row):
     position = None
     global previous_high, previous_low
-
+    row['g1'] = row['high'].shift(1)
     if row['uptrend']:
         if previous_high is not None and row['high'] > previous_high and previous_high <= row['h1']:
             position = 'long'

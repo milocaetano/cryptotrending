@@ -128,8 +128,7 @@ class MyStrategy(bt.Strategy):
 
 # (Restante do código da estratégia SmaCross e MyStrategy)
 
-if __name__ == "__main__":
-    # Configurar a exchange
+def getpandadata(symbol, timeframe):
     exchange = ccxt.binance()
 
     # Obter os dados de OHLCV
@@ -138,6 +137,12 @@ if __name__ == "__main__":
     df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
     data = bt.feeds.PandasData(dataname=df, datetime="timestamp", open="open", high="high", low="low", close="close", volume="volume")
 
+    return data
+
+
+if __name__ == "__main__":
+    # Configurar a exchange
+  
     # Configurar o backtest
     cerebro = bt.Cerebro()
     cerebro.addstrategy(DoubleLeverage)
