@@ -33,31 +33,73 @@ async def market_trend(data, lookback=20):
 
     return data['trend'].iloc[-1]
 
+async def market_continuetrending(data):
+    data['prev_close'] = data['close'].shift(1)
+
+    data['bullish'] = data['close'] > data['prev_close']
+    data['bearish'] = data['close'] < data['prev_close']
+
+    data['uptrend'] = False
+    data['downtrend'] = False
+
+    for i in range(5, 13):  # Verificar de 6 a 12
+        bullish_sum = data['bullish'].rolling(window=i).sum()
+        bearish_sum = data['bearish'].rolling(window=i).sum()
+
+        data['uptrend'] = data['uptrend'] | (bullish_sum == i)
+        data['downtrend'] = data['downtrend'] | (bearish_sum == i)
+
+    data['trend'] = 'Congestionado'
+    data.loc[data['uptrend'], 'trend'] = 'Tendencia de Alta'
+    data.loc[data['downtrend'], 'trend'] = 'Tendencia de Baixa'
+
+    return data['trend'].iloc[-1]
+
 
 async def main():
     parser = argparse.ArgumentParser(description="Trend Tracker")
     parser.add_argument("--timeframe", type=str, help="Timeframe em minutos (por exemplo, 5m 1h)", required=True)
     args = parser.parse_args()
     timeframe = f'{args.timeframe}'
-    binancefuture  =exchange.binance_future_exchange()
-    symbols =cripto.fetch_symbols(binancefuture)
-    for symbol in symbols:
-        #first_part_symbol_name = symbol.split(':')[0]
-        
-        print(f"Carregando dados para {symbol}...")
-        ohlcv_data = binancefuture.fetch_ohlcv(symbol, timeframe)
-        df = pd.DataFrame(ohlcv_data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-        current_trend = await market_trend(df)
-        print(f"A tendência atual {symbol} é: {current_trend}")
-        if('Tendencia Alta' in current_trend):
-            await telegrambot.send_msg(f"TimeFrame: {timeframe}; A tendência atual {symbol} é: {current_trend}")
-        if('Tendencia Baixa' in current_trend):
-            await telegrambot.send_msg(f"TimeFrame: {timeframe}; A tendência atual {symbol} é: {current_trend}")    
-      
+    binancefuture  = exchange.binance_future_exchange()
+    symbols = cripto.fetch_symbols(binancefuture)
+
+    last_trend = {}  # Dicionário para armazenar a última tendência para cada símbolo
+
+    while True:  # Loop infinito
+        try:
+            for symbol in symbols:
+                print(f"Carregando dados para {symbol}...")
+                ohlcv_data = binancefuture.fetch_ohlcv(symbol, timeframe)
+                df = pd.DataFrame(ohlcv_data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+                df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+                current_trend = await market_continuetrending(df)
+                print(f"A tendência atual {symbol} é: {current_trend}")
+                if current_trend != 'Congestionado':
+                    coin =  symbol.replace("/", "").replace(":USDT", "")
+                    
+                    await telegrambot.send_msg(f"TimeFrame: {timeframe}; https://www.binance.com/en/futures/{coin} Tendencia de {current_trend}")
+
+                if symbol in last_trend:  # Se já temos uma tendência registrada para este símbolo
+                         
+                    if last_trend[symbol] != current_trend:  # E a tendência mudou
+                        if(current_trend == 'Congestionado'):
+                             print(f"TimeFrame: {timeframe}; {symbol} mudou de {last_trend[symbol]} para {current_trend}")                            
+                        else:                        
+                            print(f"TimeFrame: {timeframe}; {symbol} mudou de {last_trend[symbol]} para {current_trend}")
+                            await telegrambot.send_msg(f"TimeFrame: {timeframe}; {symbol} mudou de {last_trend[symbol]} para {current_trend}")
+                    last_trend[symbol] = current_trend  # Atualize a última tendência para este símbolo
+                else:  # Se ainda não temos uma tendência registrada para este símbolo
+                    last_trend[symbol] = current_trend  # Registre a tendência atual
+
+                await asyncio.sleep(1)  # Opcional: pause para evitar sobrecarregar a API
+        except KeyboardInterrupt:
+            print("Interrompido pelo usuário. Saindo...")
+            break
+        except Exception as e:
+            print(f"Erro: {e}")
+            continue
 
 if __name__ == '__main__':
-    
     asyncio.run(main())
-
 
