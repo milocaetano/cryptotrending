@@ -43,6 +43,9 @@ def analyze_trend(symbol, binance, timeframe='5m'):
 
     sma99_trending_up = sma99[-1] > sma99[-2]
     sma99_trending_down = sma99[-1] < sma99[-2]
+    
+ 
+   
 
     if (sma14[-1] > sma21[-1]) and (sma99[-1] < sma21[-1] and sma99[-1] < sma14[-1]) and sma99_trending_up:
         trend = 'Alta'
